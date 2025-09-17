@@ -99,26 +99,95 @@ app.get('/health', (req, res) => {
   });
 });
 
+app.get('/create-payment-intent', async (req, res) => {
+  // Prepare payment intent data
+  const paymentData = {
+    amount: 12347,
+    currency: 'USD',
+    capture_method: 'automatic',
+    authentication_type: 'three_ds',
+    setup_future_usage: 'on_session',
+    request_external_three_ds_authentication: false,
+    email: 'user@gmail.com',
+    description: 'Hello this is description',
+    shipping: {
+      address: {
+        line1: '1467',
+        line2: 'Harrison Street',
+        line3: 'Harrison Street',
+        city: 'San Fransico',
+        state: 'California',
+        zip: '94122',
+        country: 'US',
+        first_name: 'joseph',
+        last_name: 'Doe',
+      },
+      phone: {
+        number: '123456789',
+        country_code: '+1',
+      },
+    },
+    connector_metadata: {
+      noon: {
+        order_category: 'applepay',
+      },
+    },
+    metadata: {
+      udf1: 'value1',
+      new_customer: 'true',
+      login_date: '2019-09-10T10:11:12Z',
+    },
+    billing: {
+      address: {
+        line1: '1467',
+        line2: 'Harrison Street',
+        line3: 'Harrison Street',
+        city: 'San Fransico',
+        state: 'California',
+        zip: '94122',
+        country: 'US',
+        first_name: 'joseph',
+        last_name: 'Doe',
+      },
+      phone: {
+        number: '8056594427',
+        country_code: '+91',
+      },
+    },
+    customer_id: 'hyperswitch_sdk_demo_id',
+    ...req.body,
+  };
+
+  // Add customer_id if provided
+  if (process.env.PROFILE_ID) {
+    paymentData.profile_id = process.env.PROFILE_ID;
+  }
+
+  logger.debug('Creating payment intent with data', paymentData);
+
+  // Make API call to Hyperswitch
+  const response = await makeHyperswitchRequest('/payments', {
+    method: 'POST',
+    body: JSON.stringify(paymentData),
+  });
+
+  logger.debug('Payment intent created successfully', {
+    payment_id: response.data.payment_id,
+  });
+  // Return the payment intent data
+  res.json({
+    success: true,
+    // payment_intent: response.data,
+    clientSecret: response.data.client_secret,
+    client_secret: response.data.client_secret,
+    publishable_key: HYPERSWITCH_PUBLISHABLE_KEY,
+    publishableKey: HYPERSWITCH_PUBLISHABLE_KEY,
+  });
+});
+
 // Create Payment Intent
 app.post('/create-payment-intent', async (req, res) => {
   try {
-    // const {
-    //   // amount,
-    //   currency = 'USD',
-    //   // customer_id,
-    //   // description,
-    //   // capture_method = 'automatic',
-    //   // confirm = false,
-    //   // metadata = {},
-    // } = req.body;
-
-    // Validate required fields
-    // if (!amount) {
-    //   return res.status(400).json({
-    //     error: 'Missing required field: amount',
-    //   });
-    // }
-
     // Prepare payment intent data
     const paymentData = {
       amount: 12347,
@@ -174,6 +243,7 @@ app.post('/create-payment-intent', async (req, res) => {
         },
       },
       customer_id: 'hyperswitch_sdk_demo_id',
+      ...req.body,
     };
 
     // Add customer_id if provided
@@ -192,7 +262,6 @@ app.post('/create-payment-intent', async (req, res) => {
     logger.debug('Payment intent created successfully', {
       payment_id: response.data.payment_id,
     });
-
     // Return the payment intent data
     res.json({
       success: true,
@@ -237,13 +306,20 @@ app.use((req, res) => {
 
 // Start server
 app
-  .listen(PORT, () => {
+  .listen(PORT, '0.0.0.0', () => {
     logger.info(`🚀 Hyperswitch server running on port ${PORT}`);
-    logger.info(`📋 Health check: http://localhost:${PORT}/health`);
+    logger.info(`📋 iOS Health check: http://localhost:${PORT}/health`);
+    logger.info(`📋 Android Health check: http://10.0.2.2:${PORT}/health`);
     logger.info(
-      `💳 Create payment: POST http://localhost:${PORT}/create-payment-intent`
+      `💳 iOS Create payment: POST http://localhost:${PORT}/create-payment-intent`
+    );
+    logger.info(
+      `💳 Android Create payment: POST http://10.0.2.2:${PORT}/create-payment-intent`
     );
     logger.info(`🌐 Environment: ${HYPERSWITCH_BASE_URL}`);
+    logger.info(
+      `📱 Server accessible from Android simulator via 10.0.2.2:${PORT}`
+    );
   })
   .on('error', (err) => {
     if (err.code === 'EADDRINUSE') {

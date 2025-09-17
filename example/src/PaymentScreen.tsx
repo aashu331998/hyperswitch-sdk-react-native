@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { View, Button, Platform, StyleSheet, Text } from 'react-native';
 import {
   useHyper,
@@ -66,10 +66,9 @@ export default function PaymentScreen() {
       console.error('Setup failed:', error);
     }
   };
-
-  React.useEffect(() => {
+  useEffect(() => {
     setup();
-  }, [initPaymentSession]);
+  }, [setup, initPaymentSession]);
 
   const checkout = async (): Promise<void> => {
     try {
@@ -81,7 +80,6 @@ export default function PaymentScreen() {
 
       const result: PresentPaymentSheetResult =
         await presentPaymentSheet(options);
-      console.log('manideep', result);
       if (result.error) {
         console.error('Payment failed:', JSON.stringify(result.error));
         setStatus(`Payment failed: ${JSON.stringify(result.error)}`);

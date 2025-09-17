@@ -6,7 +6,6 @@ import androidx.fragment.app.Fragment
 import androidx.fragment.app.FragmentActivity
 import androidx.fragment.app.FragmentManager
 import androidx.fragment.app.FragmentTransaction
-import com.facebook.react.bridge.Arguments
 import com.facebook.react.bridge.ReadableMap
 import com.facebook.react.bridge.ReadableType
 import com.facebook.react.bridge.ReadableArray
@@ -14,14 +13,8 @@ import com.hyperswitchsdkreactnative.internal.ReactFragment
 import org.json.JSONObject
 import org.json.JSONArray
 
-data class PaymentResult(
-  val status: String,
-  val message: String,
-)
-
 internal class HyperProvider internal constructor(private val activity: Activity) {
 
-  private var publishableKey: String? = null
   private var customBackendUrl: String? = null
   private var customLogUrl: String? = null
   private var customParams: ReadableMap? = null
@@ -35,10 +28,14 @@ internal class HyperProvider internal constructor(private val activity: Activity
     customLogUrl: String?,
     customParams: ReadableMap?
   ) {
-    this.publishableKey = publishableKey
+    Companion.publishableKey = publishableKey
     this.customBackendUrl = customBackendUrl
     this.customLogUrl = customLogUrl
     this.customParams = customParams
+    try {
+      ReactFragment.initOTAServices(context = activity)
+    }catch (_: Exception){
+    }
   }
 
   fun initPaymentSession(clientSecret: String) {
@@ -48,6 +45,7 @@ internal class HyperProvider internal constructor(private val activity: Activity
 
   fun presentPaymentSheet(readableMap: ReadableMap) {
     val activity = activity as? FragmentActivity
+    removeSheetView(true) // remove any existing payment sheet
     activity?.let {
       val propsBundle = Bundle().apply {
         putString("type", "payment")
@@ -85,7 +83,6 @@ internal class HyperProvider internal constructor(private val activity: Activity
       if (reactFragment != null) {
         it.supportFragmentManager
           .beginTransaction()
-//          .setCustomAnimations(R.anim.enter_from_bottom, R.anim.exit_to_bottom)
           .remove(reactFragment!!)
           .commit()
       }
@@ -99,6 +96,12 @@ internal class HyperProvider internal constructor(private val activity: Activity
     @JvmStatic
     var reactFragment: Fragment? = null
 
+    @JvmStatic
+    private var publishableKey: String? = null
+
+    fun publishableKey() : String {
+      return publishableKey ?: ""
+    }
 
     fun readableMapToJSON(readableMap: ReadableMap?): JSONObject {
       val json = JSONObject()

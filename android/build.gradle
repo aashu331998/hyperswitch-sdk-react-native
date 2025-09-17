@@ -6,6 +6,7 @@ buildscript {
   repositories {
     google()
     mavenCentral()
+    maven { url "https://maven.juspay.in/hyper-sdk/" }
   }
 
   dependencies {
@@ -25,6 +26,10 @@ def getExtOrIntegerDefault(name) {
   return rootProject.ext.has(name) ? rootProject.ext.get(name) : (project.properties["HyperswitchSdkReactNative_" + name]).toInteger()
 }
 
+def isNewArchitectureEnabled() {
+  return project.hasProperty("newArchEnabled") && project.newArchEnabled == "true"
+}
+
 android {
   namespace "com.hyperswitchsdkreactnative"
 
@@ -35,8 +40,10 @@ android {
     targetSdkVersion getExtOrIntegerDefault("targetSdkVersion")
     versionCode 1
     versionName "1.0"
+    buildConfigField "String", "VERSION_NAME", "\"${version}\""
+    buildConfigField "boolean", "IS_HERMES_ENABLED", hermesEnabled
+    buildConfigField "boolean", "IS_NEW_ARCHITECTURE_ENABLED", newArchEnabled
   }
-
   buildFeatures {
     buildConfig true
   }
@@ -81,10 +88,16 @@ android {
     pickFirst '**/libreactnativejni.so'
   }
 }
+rootProject.repositories {
+  mavenCentral()
+  google()
+  maven { url "https://maven.juspay.in/hyper-sdk/" }
+}
 
 repositories {
   mavenCentral()
   google()
+  maven { url "https://maven.juspay.in/hyper-sdk/" }
 }
 
 def kotlin_version = getExtOrDefault("kotlinVersion")
@@ -98,6 +111,7 @@ dependencies {
   implementation "com.google.android.gms:play-services-wallet:19.4.0"
   implementation 'androidx.activity:activity-ktx:1.10.1'
   implementation("org.greenrobot:eventbus")
+  implementation "in.juspay:hyperotareact:0.0.1-xota.10"
   // implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.7'
   // implementation 'androidx.lifecycle:lifecycle-common-java8:2.8.7'
   // implementation 'androidx.fragment:fragment-ktx:1.8.5'

@@ -8,8 +8,10 @@
 package com.hyperswitchsdkreactnative.internal
 
 import android.app.Activity
+import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import android.view.KeyEvent
 import android.view.LayoutInflater
 import android.view.View
@@ -23,7 +25,15 @@ import com.facebook.react.ReactPackage
 import com.facebook.react.internal.featureflags.ReactNativeFeatureFlags
 import com.facebook.react.modules.core.PermissionAwareActivity
 import com.facebook.react.modules.core.PermissionListener
+import com.hyperswitchsdkreactnative.BuildConfig
+import com.hyperswitchsdkreactnative.R
 import com.hyperswitchsdkreactnative.internal.DefaultReactHost.getDefaultReactHost
+import com.hyperswitchsdkreactnative.provider.HyperProvider
+import `in`.juspay.hyperota.LazyDownloadCallback
+import `in`.juspay.hyperotareact.HyperOTAReact
+import io.hyperswitch.hyperota.HyperOtaLogger
+import io.hyperswitch.react.SDKEnvironment
+import io.hyperswitch.react.Utils.Companion.checkEnvironment
 
 /**
  * Fragment for creating a React View. This allows the developer to "embed" a React Application
@@ -31,6 +41,9 @@ import com.hyperswitchsdkreactnative.internal.DefaultReactHost.getDefaultReactHo
  */
 internal open class ReactFragment : Fragment(), PermissionAwareActivity {
   protected lateinit var reactDelegate: ReactDelegate
+
+
+
   private var disableHostLifecycleEvents = false
   private var permissionListener: PermissionListener? = null
 
@@ -47,20 +60,19 @@ internal open class ReactFragment : Fragment(), PermissionAwareActivity {
       disableHostLifecycleEvents = args.getBoolean(ARG_DISABLE_HOST_LIFECYCLE_EVENTS)
     }
     checkNotNull(mainComponentName) { "Cannot loadApp if component name is null" }
-
     reactDelegate =
-        if (ReactNativeFeatureFlags.enableBridgelessArchitecture()) {
-          ReactDelegate(requireActivity(), reactHost, mainComponentName, launchOptions)
-        } else {
-          @Suppress("DEPRECATION")
-          (ReactDelegate(
-        requireActivity(),
-        reactNativeHost,
-        mainComponentName,
-        launchOptions,
-        fabricEnabled,
-    ))
-        }
+      if (ReactNativeFeatureFlags.enableBridgelessArchitecture()) {
+        ReactDelegate(requireActivity(), reactHost, mainComponentName, launchOptions)
+      } else {
+        @Suppress("DEPRECATION")
+        (ReactDelegate(
+          requireActivity(),
+          reactNativeHost,
+          mainComponentName,
+          launchOptions,
+          fabricEnabled,
+        ))
+      }
   }
 
   /**
@@ -71,20 +83,27 @@ internal open class ReactFragment : Fragment(), PermissionAwareActivity {
    */
   @Suppress("DEPRECATION")
   @Deprecated(
-      "You should not use ReactNativeHost directly in the New Architecture. Use ReactHost instead.",
-      ReplaceWith("reactHost"),
+    "You should not use ReactNativeHost directly in the New Architecture. Use ReactHost instead.",
+    ReplaceWith("reactHost"),
   )
   protected open val reactNativeHost: ReactNativeHost?
     get() = // (activity?.application as ReactApplication?)?.reactNativeHost
       object : DefaultReactNativeHost(requireActivity().application) {
         override fun getPackages(): List<ReactPackage> =
           HyperPackageList(this).packages.apply {
-            // Packages that cannot be autolinked yet can be added manually here, for example:
-            // add(MyReactNativePackage())
           }
 
         override fun getJSMainModuleName(): String = "index"
         override fun getBundleAssetName(): String = "hyperswitch.bundle"
+        override fun getJSBundleFile(): String {
+          return try {
+            hyperOTAServices?.getBundlePath()?.takeUnless { it.contains("ios") }
+              ?: "assets://hyperswitch.bundle"
+          } catch (_: Exception) {
+            "assets://hyperswitch.bundle"
+          }
+        }
+
         override fun getUseDeveloperSupport(): Boolean = false
         override val isNewArchEnabled: Boolean = true
         override val isHermesEnabled: Boolean = true
@@ -103,9 +122,9 @@ internal open class ReactFragment : Fragment(), PermissionAwareActivity {
     get() = getDefaultReactHost(requireContext(), reactNativeHost!!)
 
   override fun onCreateView(
-      inflater: LayoutInflater,
-      container: ViewGroup?,
-      savedInstanceState: Bundle?,
+    inflater: LayoutInflater,
+    container: ViewGroup?,
+    savedInstanceState: Bundle?,
   ): View? {
     reactDelegate.loadApp()
     return reactDelegate.reactRootView
@@ -158,13 +177,13 @@ internal open class ReactFragment : Fragment(), PermissionAwareActivity {
    * @return true if we handled onKeyUp
    */
   open fun onKeyUp(keyCode: Int, event: KeyEvent): Boolean =
-      reactDelegate.shouldShowDevMenuOrReload(keyCode, event)
+    reactDelegate.shouldShowDevMenuOrReload(keyCode, event)
 
   @Deprecated("Deprecated in Java")
   override fun onRequestPermissionsResult(
-      requestCode: Int,
-      permissions: Array<String>,
-      grantResults: IntArray,
+    requestCode: Int,
+    permissions: Array<String>,
+    grantResults: IntArray,
   ) {
     @Suppress("DEPRECATION")
     super.onRequestPermissionsResult(requestCode, permissions, grantResults)
@@ -176,16 +195,16 @@ internal open class ReactFragment : Fragment(), PermissionAwareActivity {
   }
 
   override fun checkPermission(permission: String, pid: Int, uid: Int): Int =
-      activity?.checkPermission(permission, pid, uid) ?: 0
+    activity?.checkPermission(permission, pid, uid) ?: 0
 
   override fun checkSelfPermission(permission: String): Int =
-      activity?.checkSelfPermission(permission) ?: 0
+    activity?.checkSelfPermission(permission) ?: 0
 
   @Suppress("DEPRECATION")
   override fun requestPermissions(
-      permissions: Array<String>,
-      requestCode: Int,
-      listener: PermissionListener?,
+    permissions: Array<String>,
+    requestCode: Int,
+    listener: PermissionListener?,
   ) {
     permissionListener = listener
     requestPermissions(permissions, requestCode)
@@ -222,7 +241,8 @@ internal open class ReactFragment : Fragment(), PermissionAwareActivity {
     fun build(): ReactFragment = newInstance(componentName, launchOptions, fabricEnabled)
 
     @Deprecated(
-        "You should not change call ReactFragment.setFabricEnabled. Instead enable the NewArchitecture for the whole application with newArchEnabled=true in your gradle.properties file")
+      "You should not change call ReactFragment.setFabricEnabled. Instead enable the NewArchitecture for the whole application with newArchEnabled=true in your gradle.properties file"
+    )
     fun setFabricEnabled(fabricEnabled: Boolean): Builder {
       this.fabricEnabled = fabricEnabled
       return this
@@ -235,9 +255,50 @@ internal open class ReactFragment : Fragment(), PermissionAwareActivity {
     protected const val ARG_FABRIC_ENABLED: String = "arg_fabric_enabled"
 
     @Deprecated(
-        "We will remove this and use a different solution for handling Fragment lifecycle events.")
+      "We will remove this and use a different solution for handling Fragment lifecycle events."
+    )
     protected const val ARG_DISABLE_HOST_LIFECYCLE_EVENTS: String =
-        "arg_disable_host_lifecycle_events"
+      "arg_disable_host_lifecycle_events"
+
+    private var hyperOTAServices: HyperOTAReact? = null
+    private lateinit var tracker: HyperOtaLogger
+
+    fun initOTAServices(
+      context :  Context
+    ) {
+      val environment = checkEnvironment(HyperProvider.publishableKey())
+      Log.i("hyperota", environment.toString())
+      val hyperOTAUrl = context.getString(
+          if (environment == SDKEnvironment.SANDBOX)
+            R.string.hyperOTASandBoxEndPoint
+          else
+            R.string.hyperOTAEndPoint
+      )
+      if (hyperOTAUrl != "hyperOTA_END_POINT_") {
+        tracker = HyperOtaLogger()
+        val headers = mapOf(
+          "Content-Encoding" to "br, gzip"
+        )
+        context.applicationContext?.let {
+          HyperOTAReact(
+            it,
+            "hyperswitchRN",
+            "hyperswitch.bundle",
+            BuildConfig.VERSION_NAME,
+            "$hyperOTAUrl/mobile-ota/rn/android/${BuildConfig.VERSION_NAME}/config.json",
+            headers,
+            object : LazyDownloadCallback {
+              override fun fileInstalled(filePath: String, success: Boolean) {
+              }
+
+              override fun lazySplitsInstalled(success: Boolean) {
+              }
+            },
+            tracker,
+          )
+        }.also { hyperOTAServices = it }
+      }
+    }
 
     /**
      * @param componentName The name of the react native component
@@ -246,16 +307,16 @@ internal open class ReactFragment : Fragment(), PermissionAwareActivity {
      * @return A new instance of fragment ReactFragment.
      */
     private fun newInstance(
-        componentName: String?,
-        launchOptions: Bundle?,
-        fabricEnabled: Boolean,
+      componentName: String?,
+      launchOptions: Bundle?,
+      fabricEnabled: Boolean,
     ): ReactFragment {
       val args =
-          Bundle().apply {
-            putString(ARG_COMPONENT_NAME, componentName)
-            putBundle(ARG_LAUNCH_OPTIONS, launchOptions)
-            putBoolean(ARG_FABRIC_ENABLED, fabricEnabled)
-          }
+        Bundle().apply {
+          putString(ARG_COMPONENT_NAME, componentName)
+          putBundle(ARG_LAUNCH_OPTIONS, launchOptions)
+          putBoolean(ARG_FABRIC_ENABLED, fabricEnabled)
+        }
       return ReactFragment().apply { setArguments(args) }
     }
   }

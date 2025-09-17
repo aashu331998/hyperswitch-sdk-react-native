@@ -1,15 +1,15 @@
 package com.hyperswitchsdkreactnative.modules
 
 
-import android.annotation.SuppressLint
+import android.R.attr.id
+import androidx.fragment.app.FragmentActivity
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.module.annotations.ReactModule
 import com.facebook.react.bridge.Promise
 import com.facebook.react.bridge.ReadableMap
-import com.facebook.react.bridge.WritableMap
-import com.facebook.react.bridge.WritableNativeMap
 import com.hyperswitchsdkreactnative.NativeHyperswitchSdkReactNativeSpec
 import com.hyperswitchsdkreactnative.provider.HyperProvider
+import io.hyperswitch.react.Utils
 
 @ReactModule(name = HyperswitchSdkReactNativeModule.NAME)
 class HyperswitchSdkReactNativeModule(reactContext: ReactApplicationContext) :
@@ -63,7 +63,6 @@ class HyperswitchSdkReactNativeModule(reactContext: ReactApplicationContext) :
       hyperProvider?.let { provider ->
         sheetPromise = promise
         provider.presentPaymentSheet(readableMap)
-
       }
     } catch (e: Exception) {
       promise?.reject("PRESENT_ERROR", "Failed to present payment sheet: ${e.message}")
@@ -82,13 +81,6 @@ class HyperswitchSdkReactNativeModule(reactContext: ReactApplicationContext) :
     fun resolvePromise(data: Any?) {
       try {
         sheetPromise?.resolve(data)
-      } catch (e: Exception) {
-      }
-    }
-
-    fun rejectPromise(code: String, message: String?) {
-      try {
-        sheetPromise?.reject(code, message ?: "Payment Failed")
       } catch (e: Exception) {
       }
     }
